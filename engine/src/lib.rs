@@ -1,11 +1,7 @@
-use std::path::Path;
 use wgpu::util::DeviceExt;
+use winit::event::{Event, WindowEvent};
+pub mod display_handler;
 
-use winit::{
-    event::{Event, WindowEvent},
-    event_loop::EventLoop,
-    window::{Icon, Window},
-};
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
@@ -44,35 +40,14 @@ const VERTICES: &[Vertex] = &[
     },
 ];
 
-async fn run(event_loop: EventLoop<()>, window: Window) {
-    let mut size = window.inner_size();
-    size.width = size.width.max(1);
-    size.height = size.height.max(1);
-
-    let instance = wgpu::Instance::default();
-
-    let surface = unsafe { instance.create_surface(&window).unwrap() };
-    let adapter = instance
-        .request_adapter(&wgpu::RequestAdapterOptions {
-            power_preference: wgpu::PowerPreference::HighPerformance,
-            force_fallback_adapter: false,
-            compatible_surface: Some(&surface),
-        })
-        .await
-        .expect("Cant create adapter");
-
-    let (device, queue) = adapter
-        .request_device(
-            &wgpu::DeviceDescriptor {
-                label: Some("device"),
-                features: wgpu::Features::empty(),
-                limits: wgpu::Limits::downlevel_webgl2_defaults()
-                    .using_resolution(adapter.limits()),
-            },
-            None,
-        )
-        .await
-        .expect("cant create device");
+pub async fn run(game_window : display_handler::GameWindow) {
+    let device = &game_window.device;
+    let queue = &game_window.queue;
+    let adapter = &game_window.adapter;
+    let surface = &game_window.surface;
+    let window = &game_window.window;
+    
+    let size = window.inner_size();
 
     let shader = device.create_shader_module(wgpu::include_wgsl!("shader.wgsl"));
 
@@ -124,11 +99,9 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     };
 
     surface.configure(&device, &config);
-
-    let window = &window;
-    event_loop
+    game_window.event_loop
         .run(move |event, target| {
-            let _ = (&instance, &adapter, &shader, &pipeline_layout);
+            let _ = (&adapter, &shader, &pipeline_layout);
 
             if let Event::WindowEvent {
                 window_id: _,
@@ -185,30 +158,4 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
             }
         })
         .unwrap()
-}
-
-pub async fn create_window() {
-    let event_loop = EventLoop::new().unwrap();
-    let icon_path = concat!(env!("CARGO_MANIFEST_DIR"), "/../assets/Icon.png");
-    println!("{}", icon_path);
-
-    let builder = winit::window::WindowBuilder::new()
-        .with_title("Voxel Game Engine")
-        .with_window_icon(Some(load_icon(Path::new(icon_path))))
-        .with_theme(Some(winit::window::Theme::Dark));
-    let window = builder.build(&event_loop).unwrap();
-
-    run(event_loop, window).await;
-}
-
-fn load_icon(path: &Path) -> Icon {
-    let (icon_rgba, icon_width, icon_height) = {
-        let image = image::open(path)
-            .expect("Failed to open icon path")
-            .into_rgba8();
-        let (width, height) = image.dimensions();
-        let rgba = image.into_raw();
-        (rgba, width, height)
-    };
-    Icon::from_rgba(icon_rgba, icon_width, icon_height).expect("Failed to open icon")
 }

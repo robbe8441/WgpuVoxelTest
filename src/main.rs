@@ -1,10 +1,8 @@
-use engine::*;
+use engine::{*, display_handler::GameWindow};
 
-fn main() {
+#[tokio::main]
+async fn main() {
     env_logger::init();
-
-    let rt = tokio::runtime::Runtime::new().unwrap();
-
-    let game = create_window();
-    rt.block_on(game);
+    let window = GameWindow::new().await;
+    run(window).await;
 }
