@@ -1,18 +1,16 @@
-use winit::{
-    window::{Window, Icon},
-    event_loop::EventLoop,
-};
 use std::path::Path;
-
+use winit::{
+    event_loop::EventLoop,
+    window::{Icon, Window},
+};
 
 pub struct GameWindow {
     pub window: Window,
-    pub event_loop : EventLoop<()>,
+    pub event_loop: EventLoop<()>,
     pub queue: wgpu::Queue,
     pub device: wgpu::Device,
     pub adapter: wgpu::Adapter,
     pub surface: wgpu::Surface,
-
 }
 
 impl GameWindow {
@@ -31,10 +29,9 @@ impl GameWindow {
     }
 }
 
-
-
-
-async fn create_surface(window:&Window) -> (wgpu::Device, wgpu::Queue, wgpu::Adapter, wgpu::Surface) {
+async fn create_surface(
+    window: &Window,
+) -> (wgpu::Device, wgpu::Queue, wgpu::Adapter, wgpu::Surface) {
     let mut size = window.inner_size();
     size.width = size.width.max(1);
     size.height = size.height.max(1);
@@ -67,9 +64,7 @@ async fn create_surface(window:&Window) -> (wgpu::Device, wgpu::Queue, wgpu::Ada
     (device, queue, adapter, surface)
 }
 
-
-
-pub async fn create_window() -> (Window, EventLoop<()>){
+pub async fn create_window() -> (Window, EventLoop<()>) {
     let event_loop = EventLoop::new().unwrap();
     let icon_path = concat!(env!("CARGO_MANIFEST_DIR"), "/../assets/Icon.png");
     println!("{}", icon_path);
@@ -83,7 +78,7 @@ pub async fn create_window() -> (Window, EventLoop<()>){
     (window, event_loop)
 }
 
-fn load_icon(path: &Path) -> Icon{
+fn load_icon(path: &Path) -> Icon {
     let (icon_rgba, icon_width, icon_height) = {
         let image = image::open(path)
             .expect("Failed to open icon path")
