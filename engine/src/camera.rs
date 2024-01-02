@@ -1,7 +1,4 @@
-use winit::{
-    event::*,
-    platform::modifier_supplement::KeyEventExtModifierSupplement,
-};
+use winit::{event::*, platform::modifier_supplement::KeyEventExtModifierSupplement};
 
 #[rustfmt::skip]
 pub const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::new(
@@ -38,7 +35,7 @@ impl Camera {
             target: (0.0, 0.0, 0.0).into(),
             up: cgmath::Vector3::unit_y(),
             aspect: config.width as f32 / config.height as f32,
-            fovy: 45.0,
+            fovy: 90.0,
             znear: 0.1,
             zfar: 100.0,
         }
@@ -74,7 +71,7 @@ impl CameraController {
                 match event.key_without_modifiers().as_ref() {
                     Character("a") => self.is_right_pressed = state,
                     Character("d") => self.is_left_pressed = state,
-                    Character("w") => self.is_forward_pressed= state,
+                    Character("w") => self.is_forward_pressed = state,
                     Character("s") => self.is_backward_pressed = state,
                     _ => {}
                 }
