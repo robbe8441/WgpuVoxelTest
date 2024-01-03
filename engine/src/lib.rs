@@ -1,11 +1,15 @@
+use std::time::Instant;
+
 use wgpu::util::DeviceExt;
 use winit::event::{Event, WindowEvent};
 pub mod camera;
 pub mod display_handler;
 pub mod instances;
+pub mod texture;
 use camera::Camera;
 use cgmath::prelude::*;
 use instances::*;
+use texture::*;
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
@@ -30,9 +34,9 @@ pub struct Storrage {
     index_buffer: wgpu::Buffer,
     camera_buffer: wgpu::Buffer,
     instance_buffer: wgpu::Buffer,
-    vertex_list : Vec<Vertex>,
-    indecies : Vec<u16>,
-    instances : Vec<instances::CFrame>
+    vertex_list: Vec<Vertex>,
+    indecies: Vec<u16>,
+    instances: Vec<instances::CFrame>,
 }
 
 struct RenderScene<'a> {
@@ -45,6 +49,7 @@ struct RenderScene<'a> {
     surface: &'a wgpu::Surface,
     window: &'a winit::window::Window,
     buffers: &'a Storrage,
+    depth_texture: &'a Texture,
 }
 
 fn render_scene(scene: &mut RenderScene) {
@@ -72,7 +77,14 @@ fn render_scene(scene: &mut RenderScene) {
                 },
             })],
 
-            depth_stencil_attachment: None,
+            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                view: &scene.depth_texture.view,
+                depth_ops: Some(wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(1.0),
+                    store: wgpu::StoreOp::Store,
+                }),
+                stencil_ops: None,
+            }),
             timestamp_writes: None,
             occlusion_query_set: None,
         });
@@ -90,7 +102,11 @@ fn render_scene(scene: &mut RenderScene) {
             scene.buffers.index_buffer.slice(..),
             wgpu::IndexFormat::Uint16,
         );
-        render_pass.draw_indexed(0..scene.buffers.indecies.len() as u32, 0, 0..scene.buffers.instances.len() as _);
+        render_pass.draw_indexed(
+            0..scene.buffers.indecies.len() as u32,
+            0,
+            0..scene.buffers.instances.len() as _,
+        );
     }
     scene.queue.submit(Some(encoer.finish()));
     frame.present();
@@ -177,6 +193,8 @@ pub async fn run(game_window: display_handler::GameWindow) {
         push_constant_ranges: &[],
     });
 
+    let depth_texture = texture::Texture::cretate_depth_texture(device, &config);
+
     let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
         label: Some("Render Pipeline"),
         layout: Some(&pipeline_layout),
@@ -198,7 +216,14 @@ pub async fn run(game_window: display_handler::GameWindow) {
             cull_mode: Some(wgpu::Face::Back),
             ..Default::default()
         },
-        depth_stencil: None,
+        depth_stencil: Some(wgpu::DepthStencilState {
+            format: texture::Texture::DEPTH_FORMAT,
+            depth_write_enabled: true,
+            depth_compare: wgpu::CompareFunction::Less,
+            stencil: wgpu::StencilState::default(),
+            bias: wgpu::DepthBiasState::default(),
+        }),
+
         multisample: wgpu::MultisampleState::default(),
         multiview: None,
     });
@@ -208,17 +233,26 @@ pub async fn run(game_window: display_handler::GameWindow) {
         camera_buffer,
         index_buffer,
         instance_buffer,
-        vertex_list : vec![],
-        indecies : vec![],
-        instances : vec![],
+        vertex_list: vec![],
+        indecies: vec![],
+        instances: vec![],
     };
-
 
     let mut test = Mesh::default();
     test.load(&mut buffers, device);
 
+    let mut test = Mesh {
+        cframe: CFrame {
+            position: [0.0, 1.0, 0.0].into(),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    test.load(&mut buffers, device);
 
     let mut cam_controller = camera::CameraController::new(0.1);
+
+    let start = Instant::now();
 
     surface.configure(&device, &config);
     game_window
@@ -241,22 +275,27 @@ pub async fn run(game_window: display_handler::GameWindow) {
                         surface.configure(device, &config);
                         game_window.window.request_redraw();
                     }
-                    WindowEvent::RedrawRequested => render_scene({
-                        &mut RenderScene {
-                            render_pipeline: &render_pipeline,
-                            camera_bind_group: &camera_bind_group,
-                            surface,
-                            device,
-                            window: &game_window.window,
-                            queue: &game_window.queue,
-                            camera_uniform,
-                            camera: &cam,
-                            buffers: &buffers,
-                        }
-                    }),
+                    WindowEvent::RedrawRequested => {
+                        test.cframe.position.y = start.elapsed().as_secs_f32().sin();
+
+                        render_scene({
+                            &mut RenderScene {
+                                render_pipeline: &render_pipeline,
+                                depth_texture: &depth_texture,
+                                camera_bind_group: &camera_bind_group,
+                                surface,
+                                device,
+                                window: &game_window.window,
+                                queue: &game_window.queue,
+                                camera_uniform,
+                                camera: &cam,
+                                buffers: &buffers,
+                            }
+                        });
+                    }
                     _ => {}
                 }
             }
         })
-        .unwrap()
+        .unwrap();
 }
