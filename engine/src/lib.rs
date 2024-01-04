@@ -1,5 +1,3 @@
-use std::time::Instant;
-
 use wgpu::util::DeviceExt;
 use winit::event::{Event, WindowEvent};
 pub mod camera;
@@ -37,6 +35,25 @@ pub struct Storrage {
     vertex_list: Vec<Vertex>,
     indecies: Vec<u16>,
     instances: Vec<instances::CFrame>,
+    diffuse_bind_group: wgpu::BindGroup,
+}
+
+impl Storrage {
+    fn update_instance_buffer(&mut self, device: &wgpu::Device) {
+        let instance_data = self
+            .instances
+            .iter()
+            .map(|v| v.to_raw())
+            .collect::<Vec<_>>();
+
+        let instance_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Instance Buffer"),
+            contents: bytemuck::cast_slice(&instance_data),
+            usage: wgpu::BufferUsages::VERTEX,
+        });
+
+        self.instance_buffer = instance_buffer;
+    }
 }
 
 struct RenderScene<'a> {
@@ -98,6 +115,7 @@ fn render_scene(scene: &mut RenderScene) {
         render_pass.set_vertex_buffer(0, scene.buffers.vertex_buffer.slice(..));
         render_pass.set_vertex_buffer(1, scene.buffers.instance_buffer.slice(..));
         render_pass.set_bind_group(0, scene.camera_bind_group, &[]);
+        render_pass.set_bind_group(1, &scene.buffers.diffuse_bind_group, &[]);
         render_pass.set_index_buffer(
             scene.buffers.index_buffer.slice(..),
             wgpu::IndexFormat::Uint16,
@@ -163,6 +181,46 @@ pub async fn run(game_window: display_handler::GameWindow) {
         usage: wgpu::BufferUsages::VERTEX,
     });
 
+    let diffuse_bytes = include_bytes!("./../../assets/Icon.png");
+    let diffuse_texture =
+        texture::Texture::from_bytes(&device, &game_window.queue, diffuse_bytes).unwrap();
+
+    let diffuse_bind_group_layout =
+        device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        multisampled: false,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 2,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                    count: None,
+                },
+            ],
+            label: Some("texture_bind_group_layout"),
+        });
+    let diffuse_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        layout: &diffuse_bind_group_layout,
+        entries: &[
+            wgpu::BindGroupEntry {
+                binding: 1,
+                resource: wgpu::BindingResource::TextureView(&diffuse_texture.view),
+            },
+            wgpu::BindGroupEntry {
+                binding: 2,
+                resource: wgpu::BindingResource::Sampler(&diffuse_texture.sampler),
+            },
+        ],
+        label: Some("diffuse_bind_group"),
+    });
     let camera_bind_group_layout =
         device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             entries: &[wgpu::BindGroupLayoutEntry {
@@ -189,7 +247,7 @@ pub async fn run(game_window: display_handler::GameWindow) {
 
     let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
         label: Some("pipeline_layout"),
-        bind_group_layouts: &[&camera_bind_group_layout],
+        bind_group_layouts: &[&camera_bind_group_layout, &diffuse_bind_group_layout],
         push_constant_ranges: &[],
     });
 
@@ -230,29 +288,20 @@ pub async fn run(game_window: display_handler::GameWindow) {
 
     let mut buffers = Storrage {
         vertex_buffer,
+        diffuse_bind_group,
         camera_buffer,
         index_buffer,
         instance_buffer,
         vertex_list: vec![],
         indecies: vec![],
-        instances: vec![],
+        instances: Vec::new(),
     };
 
-    let mut test = Mesh::default();
+    let test = Mesh::default();
     test.load(&mut buffers, device);
-
-    let mut test = Mesh {
-        cframe: CFrame {
-            position: [0.0, 1.0, 0.0].into(),
-            ..Default::default()
-        },
-        ..Default::default()
-    };
-    test.load(&mut buffers, device);
+    buffers.update_instance_buffer(&device);
 
     let mut cam_controller = camera::CameraController::new(0.1);
-
-    let start = Instant::now();
 
     surface.configure(&device, &config);
     game_window
@@ -276,7 +325,8 @@ pub async fn run(game_window: display_handler::GameWindow) {
                         game_window.window.request_redraw();
                     }
                     WindowEvent::RedrawRequested => {
-                        test.cframe.position.y = start.elapsed().as_secs_f32().sin();
+                        //test.cframe.position.y = 10.0;
+                        //buffers.update_instance_buffer(&device);
 
                         render_scene({
                             &mut RenderScene {

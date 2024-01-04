@@ -1,3 +1,4 @@
+use std::rc::Rc;
 use crate::Storrage;
 use wgpu::util::DeviceExt;
 
@@ -5,20 +6,27 @@ use wgpu::util::DeviceExt;
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct Vertex {
     position: [f32; 3],
-    color: [f32; 3],
+    uv_cords: [f32; 2],
 }
 
 impl Vertex {
-    const ATTRIBS: [wgpu::VertexAttribute; 2] =
-        wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x3];
-
     pub fn desc() -> wgpu::VertexBufferLayout<'static> {
         use std::mem;
-
         wgpu::VertexBufferLayout {
-            array_stride: mem::size_of::<Self>() as wgpu::BufferAddress,
+            array_stride: mem::size_of::<Vertex>() as wgpu::BufferAddress,
             step_mode: wgpu::VertexStepMode::Vertex,
-            attributes: &Self::ATTRIBS,
+            attributes: &[
+                wgpu::VertexAttribute {
+                    offset: 0,
+                    shader_location: 0,
+                    format: wgpu::VertexFormat::Float32x3,
+                },
+                wgpu::VertexAttribute {
+                    offset: mem::size_of::<[f32; 3]>() as wgpu::BufferAddress,
+                    shader_location: 1,
+                    format: wgpu::VertexFormat::Float32x2, // NEW!
+                },
+            ],
         }
     }
 }
@@ -28,7 +36,6 @@ impl Vertex {
 pub struct CFrame {
     pub position: cgmath::Vector3<f32>,
     pub rotation: cgmath::Quaternion<f32>,
-    pub size: cgmath::Vector3<f32>,
 }
 
 impl Default for CFrame {
@@ -36,7 +43,6 @@ impl Default for CFrame {
         CFrame {
             position: [0.0, 0.0, 0.0].into(),
             rotation: cgmath::Quaternion::new(0.0, 0.0, 0.0, 0.0),
-            size: [1.0, 1.0, 1.0].into(),
         }
     }
 }
@@ -54,7 +60,7 @@ impl CFrame {
 #[repr(C)]
 #[derive(Debug)]
 pub struct Mesh {
-    pub cframe: CFrame,
+    pub cframe: Box<CFrame>,
     pub vertecies: Vec<Vertex>,
     pub indicies: Vec<u16>,
 }
@@ -98,12 +104,14 @@ impl InstanceRaw {
 }
 
 impl Mesh {
-    pub fn load(&mut self, store: &mut Storrage, device: &wgpu::Device) {
-        let to_move = self.indicies.drain(..);
+    pub fn load(&self, store: &mut Storrage, device: &wgpu::Device) {
+        let mut indecies = self.indicies.clone();
+        let to_move = indecies.drain(..);
         store.indecies.extend(to_move);
 
-        let new_vertex = self.vertecies.drain(..);
-        store.vertex_list.extend(new_vertex);
+        let mut new_vertex = self.vertecies.clone();
+        let move_vertex = new_vertex.drain(..);
+        store.vertex_list.extend(move_vertex);
 
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Vertex Buffer"),
@@ -117,66 +125,49 @@ impl Mesh {
             usage: wgpu::BufferUsages::INDEX,
         });
 
-        store.instances.push(self.cframe);
-        let instance_data = store
-            .instances
-            .iter()
-            .map(CFrame::to_raw)
-            .collect::<Vec<_>>();
-
-        let instance_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Instance Buffer"),
-            contents: bytemuck::cast_slice(&instance_data),
-            usage: wgpu::BufferUsages::VERTEX,
-        });
-
-        println!("{:?}", store.instances);
-
+        let cframe_rc = Rc::new(self.cframe.clone());
+        store.instances.push(**cframe_rc);
         store.vertex_buffer = vertex_buffer;
         store.index_buffer = index_buffer;
-        store.instance_buffer = instance_buffer;
     }
 }
 
 impl Default for Mesh {
     fn default() -> Self {
         Mesh {
-            cframe: CFrame {
-                size: [0.1, 0.1, 0.1].into(),
-                ..Default::default()
-            },
+            cframe: Box::new(CFrame::default()),
             vertecies: vec![
                 Vertex {
                     position: [-0.5, -0.5, -0.5],
-                    color: [0.0, 0.0, 1.0],
+                    uv_cords: [0.0, 0.0],
                 },
                 Vertex {
                     position: [0.5, -0.5, -0.5],
-                    color: [0.5, 0.5, 0.0],
+                    uv_cords: [0.5, 0.5],
                 },
                 Vertex {
                     position: [0.5, 0.5, -0.5],
-                    color: [1.0, 0.0, 0.0],
+                    uv_cords: [1.0, 0.0],
                 },
                 Vertex {
                     position: [-0.5, 0.5, -0.5],
-                    color: [1.0, 0.5, 0.5],
+                    uv_cords: [0.5, 0.5],
                 },
                 Vertex {
                     position: [-0.5, 0.5, 0.5],
-                    color: [0.0, 0.0, 1.0],
+                    uv_cords: [0.0, 1.0],
                 },
                 Vertex {
                     position: [0.5, 0.5, 0.5],
-                    color: [1.0, 0.0, 1.0],
+                    uv_cords: [0.0, 1.0],
                 },
                 Vertex {
                     position: [0.5, -0.5, 0.5],
-                    color: [0.0, 1.0, 1.0],
+                    uv_cords: [1.0, 1.0],
                 },
                 Vertex {
                     position: [-0.5, -0.5, 0.5],
-                    color: [1.0, 1.0, 1.0],
+                    uv_cords: [1.0, 1.0],
                 },
             ],
             indicies: vec![
