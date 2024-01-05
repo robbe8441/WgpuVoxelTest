@@ -1,5 +1,5 @@
-use std::rc::Rc;
 use crate::Storrage;
+use std::rc::Rc;
 use wgpu::util::DeviceExt;
 
 #[repr(C)]
@@ -124,7 +124,7 @@ impl Mesh {
             contents: bytemuck::cast_slice(&store.indecies),
             usage: wgpu::BufferUsages::INDEX,
         });
-
+        
         let cframe_rc = Rc::new(self.cframe.clone());
         store.instances.push(**cframe_rc);
         store.vertex_buffer = vertex_buffer;
