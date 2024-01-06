@@ -1,5 +1,6 @@
 use crate::Storrage;
-use std::rc::Rc;
+use core::f32;
+use std::{rc::Rc, vec};
 use wgpu::util::DeviceExt;
 
 #[repr(C)]
@@ -60,7 +61,7 @@ impl CFrame {
 #[repr(C)]
 #[derive(Debug)]
 pub struct Mesh {
-    pub cframe: Box<CFrame>,
+    pub cframe: CFrame,
     pub vertecies: Vec<Vertex>,
     pub indicies: Vec<u16>,
 }
@@ -124,18 +125,101 @@ impl Mesh {
             contents: bytemuck::cast_slice(&store.indecies),
             usage: wgpu::BufferUsages::INDEX,
         });
-        
+
         let cframe_rc = Rc::new(self.cframe.clone());
-        store.instances.push(**cframe_rc);
+        store.instances.push(*cframe_rc);
+
+        let instance_data = store
+            .instances
+            .iter()
+            .map(|v| v.to_raw())
+            .collect::<Vec<_>>();
+
+        let instance_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Index Buffer"),
+            contents: bytemuck::cast_slice(&instance_data),
+            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+        });
+
+        store.instance_buffer = instance_buffer;
         store.vertex_buffer = vertex_buffer;
         store.index_buffer = index_buffer;
     }
+
+    pub fn from_file_obj(file: String) -> Self {
+        let mut vertex_pos = vec![];
+        let mut indicies = vec![];
+        let mut tex_cords = vec![];
+
+        let mut vertex_res: Vec<Vertex> = vec![];
+
+        for line in file.lines() {
+            let nums = get_numbers(line);
+
+            if line.starts_with("v ") {
+                vertex_pos.push([nums[0], nums[1], nums[2]]);
+                continue;
+            }
+            if line.starts_with("vt") {
+                tex_cords.push([nums[0], nums[1]]);
+            }
+            if line.starts_with("f") {
+                let data = get_face_data(line);
+                let start = vertex_res.len() as u16;
+
+                vertex_res.push(Vertex {
+                    position: vertex_pos[data[0] as usize - 1],
+                    uv_cords: tex_cords[data[1] as usize - 1],
+                });
+                vertex_res.push(Vertex {
+                    position: vertex_pos[data[3] as usize - 1],
+                    uv_cords: tex_cords[data[4] as usize - 1],
+                });
+                vertex_res.push(Vertex {
+                    position: vertex_pos[data[6] as usize - 1],
+                    uv_cords: tex_cords[data[7] as usize - 1],
+                });
+                indicies.push(start);
+                indicies.push(start + 2);
+                indicies.push(start + 1);
+            }
+        }
+        Self {
+            vertecies: vertex_res,
+            cframe: CFrame::default(),
+            indicies,
+        }
+    }
+}
+
+fn get_numbers(input: &str) -> Vec<f32> {
+    let mut res: Vec<f32> = Vec::new();
+
+    for num in input.split_whitespace() {
+        if num.parse::<f32>().is_ok() {
+            res.push(num.parse().unwrap())
+        }
+    }
+
+    res
+}
+
+fn get_face_data(input: &str) -> Vec<u16> {
+    let mut res: Vec<u16> = Vec::new();
+
+    for num in input.split(&[' ', '/']) {
+        if num.parse::<u16>().is_ok() {
+            res.push(num.parse().unwrap())
+        }
+    }
+
+    res
 }
 
 impl Default for Mesh {
     fn default() -> Self {
         Mesh {
-            cframe: Box::new(CFrame::default()),
+            cframe: CFrame::default(),
             vertecies: vec![
                 Vertex {
                     position: [-0.5, -0.5, -0.5],

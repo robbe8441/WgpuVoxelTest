@@ -31,7 +31,7 @@ impl CameraUniform {
 }
 
 pub struct Storrage {
-    uniform_buffer : wgpu::Buffer,
+    uniform_buffer: wgpu::Buffer,
     vertex_buffer: wgpu::Buffer,
     index_buffer: wgpu::Buffer,
     camera_buffer: wgpu::Buffer,
@@ -43,20 +43,14 @@ pub struct Storrage {
 }
 
 impl Storrage {
-    fn update_instance_buffer(&mut self, device: &wgpu::Device) {
+    fn update_instance_buffer(&mut self, queue: &wgpu::Queue) {
         let instance_data = self
             .instances
             .iter()
             .map(|v| v.to_raw())
             .collect::<Vec<_>>();
 
-        let instance_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Instance Buffer"),
-            contents: bytemuck::cast_slice(&instance_data),
-            usage: wgpu::BufferUsages::VERTEX,
-        });
-
-        self.instance_buffer = instance_buffer;
+        queue.write_buffer(&self.instance_buffer, 0, bytemuck::cast_slice(&instance_data));
     }
 }
 
@@ -71,7 +65,7 @@ struct RenderScene<'a> {
     window: &'a winit::window::Window,
     buffers: &'a Storrage,
     depth_texture: &'a Texture,
-    start_time : SystemTime,
+    start_time: SystemTime,
 }
 
 fn render_scene(scene: &mut RenderScene) {
@@ -80,7 +74,7 @@ fn render_scene(scene: &mut RenderScene) {
     scene.queue.write_buffer(
         &scene.buffers.uniform_buffer,
         0,
-        &bytemuck::cast_slice(&[time])
+        &bytemuck::cast_slice(&[time]),
     );
 
     let frame = scene
@@ -192,7 +186,7 @@ pub async fn run(game_window: display_handler::GameWindow) {
     let instance_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("Instance Buffer"),
         contents: bytemuck::cast_slice(&Vec::<u8>::new()),
-        usage: wgpu::BufferUsages::VERTEX,
+        usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
     });
 
     let uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
@@ -247,13 +241,13 @@ pub async fn run(game_window: display_handler::GameWindow) {
                 resource: wgpu::BindingResource::Sampler(&diffuse_texture.sampler),
             },
             wgpu::BindGroupEntry {
-                binding : 3,
+                binding: 3,
                 resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-                    buffer : &uniform_buffer,
+                    buffer: &uniform_buffer,
                     offset: 0,
-                    size: None
-                })
-            }
+                    size: None,
+                }),
+            },
         ],
         label: Some("diffuse_bind_group"),
     });
@@ -262,7 +256,7 @@ pub async fn run(game_window: display_handler::GameWindow) {
         device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             entries: &[wgpu::BindGroupLayoutEntry {
                 binding: 0,
-                visibility: wgpu::ShaderStages::VERTEX,
+                visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
                 ty: wgpu::BindingType::Buffer {
                     ty: wgpu::BufferBindingType::Uniform,
                     has_dynamic_offset: false,
@@ -303,11 +297,23 @@ pub async fn run(game_window: display_handler::GameWindow) {
         fragment: Some(wgpu::FragmentState {
             module: &shader,
             entry_point: "fs_main",
-            targets: &[Some(swapchain_format.into())],
+            targets: &[Some(wgpu::ColorTargetState{
+                format: swapchain_format.into(),
+
+                blend: Some(wgpu::BlendState{
+                    color: wgpu::BlendComponent{
+                        src_factor: wgpu::BlendFactor::SrcAlpha,
+                        dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+                        operation: wgpu::BlendOperation::Add,},
+                    alpha: wgpu::BlendComponent::OVER
+                }),
+
+                write_mask: wgpu::ColorWrites::ALL,
+            })],
         }),
 
         primitive: wgpu::PrimitiveState {
-            front_face: wgpu::FrontFace::Ccw,
+            front_face: wgpu::FrontFace::Cw,
             cull_mode: Some(wgpu::Face::Back),
             ..Default::default()
         },
@@ -335,13 +341,13 @@ pub async fn run(game_window: display_handler::GameWindow) {
         instances: Vec::new(),
     };
 
+    let test = //Mesh::default();
+        instances::Mesh::from_file_obj(include_str!("./../../assets/untitled.obj").to_string());
 
-
-    let test = Mesh::default();
     test.load(&mut buffers, device);
-    buffers.update_instance_buffer(&device);
+    buffers.update_instance_buffer(&game_window.queue);
 
-    let mut cam_controller = camera::CameraController::new(0.1);
+    let mut cam_controller = camera::CameraController::new(0.01);
     let start_time = SystemTime::now();
 
     surface.configure(&device, &config);
@@ -366,7 +372,6 @@ pub async fn run(game_window: display_handler::GameWindow) {
                         game_window.window.request_redraw();
                     }
                     WindowEvent::RedrawRequested => {
-
                         //test.cframe.position.y = 10.0;
                         //buffers.update_instance_buffer(&device);
 

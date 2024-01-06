@@ -20,7 +20,7 @@ struct VertexInput {
 
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
-    @location(0) uv_cords: vec2<f32>,
+    @location(0) uv_cords: vec3<f32>,
 };
 
 @vertex
@@ -37,8 +37,8 @@ fn vs_main(
     );
 
     var out: VertexOutput;
-    out.uv_cords = model.uv_cords;
     out.clip_position = camera.view_proj * model_matrix * vec4<f32>(model.position, 1.0);
+    out.uv_cords = model.position;
     return out;
 }
 
@@ -47,7 +47,6 @@ fn vs_main(
 struct Uniforms {
   time : f32,
 }
-
 
 @group(1) @binding(1)
 var t_diffuse: texture_3d<f32>;
@@ -58,6 +57,17 @@ var<uniform> uniforms: Uniforms;
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    let tex_coord = vec3(in.uv_cords, (sin(uniforms.time) + 1.0) / 2.0);
-    return textureSample(t_diffuse, s_diffuse, tex_coord);
+  let start_pos = vec4(in.uv_cords + vec3(0.5), 1.0);
+  let dir = normalize(camera.view_proj * start_pos);
+
+  for (var i=1; i<100; i=i+1) {
+    let checkpos = start_pos + (dir / vec4(100.0)) * vec4(f32(i));
+    let val = textureSample(t_diffuse, s_diffuse, checkpos.xyz);
+
+    if any(val == vec4(1.0)) {
+      return val;
+    }
+  }
+
+  return vec4(0.0);
 }
