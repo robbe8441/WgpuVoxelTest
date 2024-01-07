@@ -1,12 +1,12 @@
 use crate::texture::Texture;
-use noise::{NoiseFn, SuperSimplex};
+use noise::{NoiseFn, Perlin};
 
 const CHUNK_SIZE: u32 = 20;
-const NOISE_SIZE: f64 = 20.0;
+const NOISE_SIZE: f64 = 10.0;
 
 pub fn generate_chunk(device: &wgpu::Device, queue: &wgpu::Queue) -> Texture {
     let total_blocks = CHUNK_SIZE.pow(3);
-    let noise = SuperSimplex::new(1);
+    let noise = Perlin::new(5);
     let mut result: Vec<u8> = Vec::with_capacity((total_blocks * 4) as usize);
 
     for i in 0..total_blocks {
@@ -63,9 +63,9 @@ pub fn generate_chunk(device: &wgpu::Device, queue: &wgpu::Queue) -> Texture {
 
     let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
     let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-        address_mode_u: wgpu::AddressMode::MirrorRepeat,
-        address_mode_v: wgpu::AddressMode::MirrorRepeat,
-        address_mode_w: wgpu::AddressMode::MirrorRepeat,
+        address_mode_u: wgpu::AddressMode::ClampToEdge,
+        address_mode_v: wgpu::AddressMode::ClampToEdge,
+        address_mode_w: wgpu::AddressMode::ClampToEdge,
         mag_filter: wgpu::FilterMode::Nearest,
         min_filter: wgpu::FilterMode::Nearest,
         mipmap_filter: wgpu::FilterMode::Nearest,

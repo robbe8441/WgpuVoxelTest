@@ -45,7 +45,9 @@ fn vs_main(
 
 
 struct Uniforms {
-  time : f32,
+  cam_x : f32,
+  cam_y : f32,
+  cam_z : f32,
 }
 
 @group(1) @binding(1)
@@ -57,15 +59,22 @@ var<uniform> uniforms: Uniforms;
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-  let start_pos = vec4(in.uv_cords + vec3(0.5), 1.0);
-  let dir = normalize(camera.view_proj * start_pos);
+  let start_pos = in.uv_cords;
+  let cam_pos = vec3(uniforms.cam_x, uniforms.cam_y, uniforms.cam_z);
+  let dir = normalize(cam_pos - start_pos);
 
-  for (var i=1; i<100; i=i+1) {
-    let checkpos = start_pos + (dir / vec4(100.0)) * vec4(f32(i));
-    let val = textureSample(t_diffuse, s_diffuse, checkpos.xyz);
+  for (var i=1; i<2000; i=i+1) {
+    let checkpos = start_pos/vec3(2.0) + (dir / vec3(500.0)) * vec3(f32(-i));
+
+    if checkpos.x > 0.5 || checkpos.x < -0.5 || checkpos.z > 0.5 || checkpos.z < -0.5 || checkpos.y < -0.5 || checkpos.y > 0.5 {
+      return vec4(0.0);
+    }
+
+
+    let val = textureSample(t_diffuse, s_diffuse, checkpos.xyz + vec3(0.5));
 
     if any(val == vec4(1.0)) {
-      return val;
+      return val / vec4(vec3(f32(i / 50)), 1.0);
     }
   }
 

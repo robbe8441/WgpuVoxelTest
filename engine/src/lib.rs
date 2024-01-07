@@ -1,5 +1,4 @@
-use std::{f32, time::SystemTime};
-
+use std::f32;
 use wgpu::util::DeviceExt;
 use winit::event::{Event, WindowEvent};
 pub mod camera;
@@ -65,16 +64,21 @@ struct RenderScene<'a> {
     window: &'a winit::window::Window,
     buffers: &'a Storrage,
     depth_texture: &'a Texture,
-    start_time: SystemTime,
 }
 
 fn render_scene(scene: &mut RenderScene) {
-    let time = scene.start_time.elapsed().unwrap().as_secs_f32();
 
     scene.queue.write_buffer(
         &scene.buffers.uniform_buffer,
         0,
-        &bytemuck::cast_slice(&[time]),
+        &bytemuck::cast_slice(&[scene.camera.eye.x, scene.camera.eye.y, scene.camera.eye.z]),
+    );
+
+    scene.camera_uniform.update_view_proj(&scene.camera);
+    scene.queue.write_buffer(
+        &scene.buffers.camera_buffer,
+        0,
+        bytemuck::cast_slice(&[scene.camera_uniform]),
     );
 
     let frame = scene
@@ -96,7 +100,7 @@ fn render_scene(scene: &mut RenderScene) {
                 view: &view,
                 resolve_target: None,
                 ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(wgpu::Color::BLUE),
+                    load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
                     store: wgpu::StoreOp::Store,
                 },
             })],
@@ -112,12 +116,6 @@ fn render_scene(scene: &mut RenderScene) {
             timestamp_writes: None,
             occlusion_query_set: None,
         });
-        scene.camera_uniform.update_view_proj(&scene.camera);
-        scene.queue.write_buffer(
-            &scene.buffers.camera_buffer,
-            0,
-            bytemuck::cast_slice(&[scene.camera_uniform]),
-        );
         render_pass.set_pipeline(&scene.render_pipeline);
         render_pass.set_vertex_buffer(0, scene.buffers.vertex_buffer.slice(..));
         render_pass.set_vertex_buffer(1, scene.buffers.instance_buffer.slice(..));
@@ -191,7 +189,7 @@ pub async fn run(game_window: display_handler::GameWindow) {
 
     let uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
         label: None,
-        size: std::mem::size_of::<f32>() as u64,
+        size: std::mem::size_of::<f32>() as u64 * 3,
         usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         mapped_at_creation: false,
     });
@@ -313,42 +311,41 @@ pub async fn run(game_window: display_handler::GameWindow) {
         }),
 
         primitive: wgpu::PrimitiveState {
-            front_face: wgpu::FrontFace::Cw,
-            cull_mode: Some(wgpu::Face::Back),
-            ..Default::default()
-        },
-        depth_stencil: Some(wgpu::DepthStencilState {
-            format: texture::Texture::DEPTH_FORMAT,
-            depth_write_enabled: true,
-            depth_compare: wgpu::CompareFunction::Less,
-            stencil: wgpu::StencilState::default(),
-            bias: wgpu::DepthBiasState::default(),
-        }),
+                front_face: wgpu::FrontFace::Cw,
+                cull_mode: Some(wgpu::Face::Back),
+                ..Default::default()
+            },
+            depth_stencil: Some(wgpu::DepthStencilState {
+                format: texture::Texture::DEPTH_FORMAT,
+                depth_write_enabled: true,
+                depth_compare: wgpu::CompareFunction::Less,
+                stencil: wgpu::StencilState::default(),
+                bias: wgpu::DepthBiasState::default(),
+            }),
 
-        multisample: wgpu::MultisampleState::default(),
-        multiview: None,
-    });
+            multisample: wgpu::MultisampleState::default(),
+            multiview: None,
+        });
 
-    let mut buffers = Storrage {
-        uniform_buffer,
-        vertex_buffer,
-        diffuse_bind_group,
-        camera_buffer,
-        index_buffer,
-        instance_buffer,
-        vertex_list: vec![],
-        indecies: vec![],
-        instances: Vec::new(),
-    };
+        let mut buffers = Storrage {
+            uniform_buffer,
+            vertex_buffer,
+            diffuse_bind_group,
+            camera_buffer,
+            index_buffer,
+            instance_buffer,
+            vertex_list: vec![],
+            indecies: vec![],
+            instances: Vec::new(),
+        };
 
-    let test = //Mesh::default();
-        instances::Mesh::from_file_obj(include_str!("./../../assets/untitled.obj").to_string());
+        let test = //Mesh::default();
+            instances::Mesh::from_file_obj(include_str!("./../../assets/untitled.obj").to_string());
 
     test.load(&mut buffers, device);
     buffers.update_instance_buffer(&game_window.queue);
 
     let mut cam_controller = camera::CameraController::new(0.01);
-    let start_time = SystemTime::now();
 
     surface.configure(&device, &config);
     game_window
@@ -377,7 +374,6 @@ pub async fn run(game_window: display_handler::GameWindow) {
 
                         render_scene({
                             &mut RenderScene {
-                                start_time,
                                 render_pipeline: &render_pipeline,
                                 depth_texture: &depth_texture,
                                 camera_bind_group: &camera_bind_group,
