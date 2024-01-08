@@ -51,32 +51,29 @@ struct Uniforms {
 }
 
 @group(1) @binding(1)
-var t_diffuse: texture_3d<f32>;
+var t_diffuse: texture_3d<u32>;
 @group(1) @binding(2)
-var s_diffuse: sampler;
-@group(1) @binding(3)
 var<uniform> uniforms: Uniforms;
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-  let start_pos = in.uv_cords;
   let cam_pos = vec3(uniforms.cam_x, uniforms.cam_y, uniforms.cam_z);
-  let dir = normalize(cam_pos - start_pos);
+  let start_pos = in.uv_cords + vec3(1.0);
+  let dir = normalize(cam_pos - in.uv_cords);
 
-  for (var i=1; i<2000; i=i+1) {
-    let checkpos = start_pos/vec3(2.0) + (dir / vec3(500.0)) * vec3(f32(-i));
+  for (var i=0; i<2000; i=i+1) {
+    let checkpos = start_pos + (dir / vec3(500.0)) * vec3(f32(-i));
 
-    if checkpos.x > 0.5 || checkpos.x < -0.5 || checkpos.z > 0.5 || checkpos.z < -0.5 || checkpos.y < -0.5 || checkpos.y > 0.5 {
+    if checkpos.x > 2.0 || checkpos.x < 0.0 || checkpos.z > 2.0 || checkpos.z < 0.0 || checkpos.y < 0.0 || checkpos.y > 2.0 {
       return vec4(0.0);
     }
 
+    let pos = checkpos * vec3(49.999);
+    let val = textureLoad(t_diffuse, vec3i(i32(pos.x) % 100, i32(pos.y) % 100, i32(pos.z) % 100), 0);
 
-    let val = textureSample(t_diffuse, s_diffuse, checkpos.xyz + vec3(0.5));
-
-    if any(val == vec4(1.0)) {
-      return val / vec4(vec3(f32(i / 50)), 1.0);
+    if any(val.r != 0u) {
+        return vec4(f32(val.r) / f32(i));
     }
   }
-
   return vec4(0.0);
 }

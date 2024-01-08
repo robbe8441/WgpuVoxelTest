@@ -1,13 +1,13 @@
 use crate::texture::Texture;
-use noise::{NoiseFn, Perlin};
+use noise::{NoiseFn, SuperSimplex};
 
-const CHUNK_SIZE: u32 = 20;
-const NOISE_SIZE: f64 = 10.0;
+const CHUNK_SIZE: u32 = 100;
+const NOISE_SIZE: f64 = 50.0;
 
 pub fn generate_chunk(device: &wgpu::Device, queue: &wgpu::Queue) -> Texture {
     let total_blocks = CHUNK_SIZE.pow(3);
-    let noise = Perlin::new(5);
-    let mut result: Vec<u8> = Vec::with_capacity((total_blocks * 4) as usize);
+    let noise = SuperSimplex::new(5);
+    let mut result: Vec<u8> = Vec::with_capacity(total_blocks as usize);
 
     for i in 0..total_blocks {
         let x = i % CHUNK_SIZE;
@@ -20,12 +20,12 @@ pub fn generate_chunk(device: &wgpu::Device, queue: &wgpu::Queue) -> Texture {
             z as f64 / NOISE_SIZE,
         ]);
 
-        let data = if val > 0.0 { 255 } else { 0 };
+        if val > 0.0 {
+            result.push(255);
+        } else {
+            result.push(0);
+        }
 
-        result.push(data);
-        result.push(data);
-        result.push(data);
-        result.push(data);
     }
 
     let size = wgpu::Extent3d {
@@ -40,7 +40,7 @@ pub fn generate_chunk(device: &wgpu::Device, queue: &wgpu::Queue) -> Texture {
         mip_level_count: 1,
         sample_count: 1,
         dimension: wgpu::TextureDimension::D3,
-        format: wgpu::TextureFormat::Rgba8UnormSrgb,
+        format: wgpu::TextureFormat::R8Uint,
         usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
         view_formats: &[],
     });
@@ -55,7 +55,7 @@ pub fn generate_chunk(device: &wgpu::Device, queue: &wgpu::Queue) -> Texture {
         &result,
         wgpu::ImageDataLayout {
             offset: 0,
-            bytes_per_row: Some(CHUNK_SIZE * 4),
+            bytes_per_row: Some(CHUNK_SIZE),
             rows_per_image: Some(CHUNK_SIZE),
         },
         size,
