@@ -1,4 +1,4 @@
-use winit::{event::*, platform::modifier_supplement::KeyEventExtModifierSupplement};
+use winit::event::*;
 
 #[rustfmt::skip]
 pub const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::new(
@@ -39,36 +39,33 @@ impl Camera {
 }
 
 pub struct CameraController {
-    speed: f32,
-    is_forward_pressed: bool,
-    is_backward_pressed: bool,
-    is_left_pressed: bool,
-    is_right_pressed: bool,
+    sensitivity: f32,
+    input_position: [f64; 2],
+    zoom_dis : f32,
 }
 
 impl CameraController {
-    pub fn new(speed: f32) -> Self {
+    pub fn new(sensitivity: f32) -> Self {
         Self {
-            speed,
-            is_forward_pressed: false,
-            is_backward_pressed: false,
-            is_left_pressed: false,
-            is_right_pressed: false,
+            sensitivity,
+            input_position : [0.0, 0.0],
+            zoom_dis : 2.0,
         }
     }
 
     pub fn process_events(&mut self, event: &WindowEvent) {
         match event {
-            WindowEvent::KeyboardInput { event, .. } => {
-                let state = event.state == ElementState::Pressed;
 
-                use winit::keyboard::Key::Character;
+            WindowEvent::CursorMoved { position, .. } => {
+                let senv = self.sensitivity as f64;
+                self.input_position = [position.x.to_radians() * senv, position.y.to_radians() * senv];
+            }
 
-                match event.key_without_modifiers().as_ref() {
-                    Character("a") => self.is_right_pressed = state,
-                    Character("d") => self.is_left_pressed = state,
-                    Character("w") => self.is_forward_pressed = state,
-                    Character("s") => self.is_backward_pressed = state,
+            WindowEvent::MouseWheel {delta, ..} => {
+                match delta {
+                    MouseScrollDelta::LineDelta(_x, y) => {
+                        self.zoom_dis = (self.zoom_dis - y / 10.0).max(1.0);
+                    },
                     _ => {}
                 }
             }
@@ -77,24 +74,13 @@ impl CameraController {
     }
 
     pub fn update_camera(&self, camera: &mut Camera) {
-        use cgmath::InnerSpace;
-        let forward = camera.target - camera.eye;
-        let forward_norm = forward.normalize();
+        let x_input = self.input_position[0];
+        let y_input = self.input_position[1];
 
-        if self.is_forward_pressed {
-            camera.eye += forward_norm * self.speed;
-        }
-        if self.is_backward_pressed {
-            camera.eye -= forward_norm * self.speed;
-        }
+        let x = y_input.sin() * x_input.cos();
+        let y = -y_input.cos();
+        let z = y_input.sin() * x_input.sin();
 
-        let right = forward_norm.cross(camera.up);
-
-        if self.is_right_pressed {
-            camera.eye -= right * self.speed;
-        }
-        if self.is_left_pressed {
-            camera.eye += right * self.speed;
-        }
+        camera.eye = cgmath::Point3::new(x as f32, y as f32, z as f32) * self.zoom_dis;
     }
 }

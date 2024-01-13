@@ -301,7 +301,7 @@ pub async fn run(game_window: display_handler::GameWindow) {
         }),
 
         primitive: wgpu::PrimitiveState {
-                front_face: wgpu::FrontFace::Cw,
+                front_face: wgpu::FrontFace::Ccw,
                 cull_mode: Some(wgpu::Face::Back),
                 ..Default::default()
             },
@@ -335,7 +335,7 @@ pub async fn run(game_window: display_handler::GameWindow) {
     test.load(&mut buffers, device);
     buffers.update_instance_buffer(&game_window.queue);
 
-    let mut cam_controller = camera::CameraController::new(0.01);
+    let mut cam_controller = camera::CameraController::new(0.5);
 
     surface.configure(&device, &config);
     game_window
