@@ -1,4 +1,4 @@
-use cgmath::{Vector3, InnerSpace};
+use cgmath::Vector3;
 use winit::{event::*, keyboard::PhysicalKey};
 
 #[rustfmt::skip]
@@ -45,23 +45,19 @@ pub struct CameraController {
     zoom_dis: f32,
     move_direction: cgmath::Vector3<f32>,
 
-    w_key : bool,
-    a_key : bool,
-    s_key : bool,
-    d_key : bool,
-    space_key : bool,
-    c_key : bool,
-
+    w_key: bool,
+    a_key: bool,
+    s_key: bool,
+    d_key: bool,
+    space_key: bool,
+    c_key: bool,
 }
 
-fn get_key_dir(key1:bool, key2:bool) -> f32 {
-    let val1 = if key1 {1.0} else {0.0};
-    let val2 = if key2 {-1.0} else {0.0};
+fn get_key_dir(key1: bool, key2: bool) -> f32 {
+    let val1 = if key1 { 1.0 } else { 0.0 };
+    let val2 = if key2 { -1.0 } else { 0.0 };
     val1 + val2
 }
-
-
-
 
 impl CameraController {
     pub fn new(sensitivity: f32) -> Self {
@@ -69,14 +65,14 @@ impl CameraController {
             sensitivity,
             mouse_input: [0.0, 0.0],
             zoom_dis: 2.0,
-            move_direction : cgmath::Vector3::new(0.0, 0.0, 0.0),
+            move_direction: cgmath::Vector3::new(0.0, 0.0, 0.0),
 
-            w_key : false,
-            a_key : false,
-            s_key : false,
-            d_key : false,
-            space_key : false,
-            c_key : false,
+            w_key: false,
+            a_key: false,
+            s_key: false,
+            d_key: false,
+            space_key: false,
+            c_key: false,
         }
     }
 
@@ -97,10 +93,16 @@ impl CameraController {
                 _ => {}
             },
 
-            DeviceEvent::Key(RawKeyEvent { physical_key, state }) => {
-                let change = if state == &ElementState::Pressed {true} else {false};
+            DeviceEvent::Key(RawKeyEvent {
+                physical_key,
+                state,
+            }) => {
+                let change = if state == &ElementState::Pressed {
+                    true
+                } else {
+                    false
+                };
                 use winit::keyboard::KeyCode;
-
 
                 match physical_key {
                     PhysicalKey::Code(KeyCode::KeyW) => self.w_key = change,
@@ -113,9 +115,10 @@ impl CameraController {
                 }
 
                 self.move_direction = Vector3::new(
-                    get_key_dir(self.a_key, self.d_key), 
-                    get_key_dir(self.space_key, self.c_key), 
-                    get_key_dir(self.w_key, self.s_key));
+                    get_key_dir(self.a_key, self.d_key),
+                    get_key_dir(self.space_key, self.c_key),
+                    get_key_dir(self.w_key, self.s_key),
+                );
             }
             _ => {}
         }
@@ -135,7 +138,6 @@ impl CameraController {
         let pos = (look_v * self.move_direction.z)
             + (right_v * -self.move_direction.x)
             + (Vector3::unit_y() * self.move_direction.y);
-
 
         camera.eye += pos / 100.0;
         camera.target = camera.eye + Vector3::new(x as f32, y as f32, z as f32);

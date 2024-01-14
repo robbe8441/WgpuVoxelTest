@@ -2,7 +2,7 @@ use crate::texture::Texture;
 use noise::{NoiseFn, SuperSimplex};
 
 const CHUNK_SIZE: u32 = 100;
-const NOISE_SIZE: f64 = 50.0;
+const NOISE_SIZE: f64 = 20.0;
 
 pub fn generate_chunk(device: &wgpu::Device, queue: &wgpu::Queue) -> Texture {
     let total_blocks = CHUNK_SIZE.pow(3);

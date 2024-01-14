@@ -7,7 +7,7 @@ pub mod display_handler;
 pub mod instances;
 pub mod texture;
 use camera::Camera;
-use cgmath::prelude::*;
+use cgmath::{prelude::*, Deg};
 use instances::*;
 use texture::*;
 
@@ -332,11 +332,22 @@ pub async fn run(game_window: display_handler::GameWindow) {
         instances: Vec::new(),
     };
 
-    let test = //Mesh::default();
-            instances::Mesh::from_file_obj(include_str!("./../../assets/untitled.obj").to_string());
+    let test = instances::Mesh::from_file_obj(include_str!("./../../assets/untitled.obj").to_string());
 
     test.load(&mut buffers, device);
     buffers.update_instance_buffer(&game_window.queue);
+
+
+
+    let mut test = instances::Mesh::from_file_obj(include_str!("./../../assets/untitled.obj").to_string());
+    test.cframe.position = [0.0, 2.0, 0.0].into();
+    test.cframe.rotation = cgmath::Quaternion::from_angle_y(Deg(10.0));
+
+    test.load(&mut buffers, device);
+    buffers.update_instance_buffer(&game_window.queue);
+    
+
+
 
     let mut cam_controller = camera::CameraController::new(0.5);
 
