@@ -49,7 +49,11 @@ impl Storrage {
             .map(|v| v.to_raw())
             .collect::<Vec<_>>();
 
-        queue.write_buffer(&self.instance_buffer, 0, bytemuck::cast_slice(&instance_data));
+        queue.write_buffer(
+            &self.instance_buffer,
+            0,
+            bytemuck::cast_slice(&instance_data),
+        );
     }
 }
 
@@ -67,7 +71,6 @@ struct RenderScene<'a> {
 }
 
 fn render_scene(scene: &mut RenderScene) {
-
     scene.queue.write_buffer(
         &scene.buffers.uniform_buffer,
         0,
@@ -137,7 +140,6 @@ fn render_scene(scene: &mut RenderScene) {
 }
 
 pub async fn run(game_window: display_handler::GameWindow) {
-
     let device = &game_window.device;
     let adapter = &game_window.adapter;
     let surface = &game_window.surface;
@@ -204,7 +206,7 @@ pub async fn run(game_window: display_handler::GameWindow) {
                 ty: wgpu::BindingType::Texture {
                     multisampled: false,
                     view_dimension: wgpu::TextureViewDimension::D3,
-                    sample_type: wgpu::TextureSampleType::Uint
+                    sample_type: wgpu::TextureSampleType::Uint,
                 },
                 count: None,
             },
@@ -285,15 +287,16 @@ pub async fn run(game_window: display_handler::GameWindow) {
         fragment: Some(wgpu::FragmentState {
             module: &shader,
             entry_point: "fs_main",
-            targets: &[Some(wgpu::ColorTargetState{
+            targets: &[Some(wgpu::ColorTargetState {
                 format: swapchain_format.into(),
 
-                blend: Some(wgpu::BlendState{
-                    color: wgpu::BlendComponent{
+                blend: Some(wgpu::BlendState {
+                    color: wgpu::BlendComponent {
                         src_factor: wgpu::BlendFactor::SrcAlpha,
                         dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
-                        operation: wgpu::BlendOperation::Add,},
-                    alpha: wgpu::BlendComponent::OVER
+                        operation: wgpu::BlendOperation::Add,
+                    },
+                    alpha: wgpu::BlendComponent::OVER,
                 }),
 
                 write_mask: wgpu::ColorWrites::ALL,
@@ -301,35 +304,35 @@ pub async fn run(game_window: display_handler::GameWindow) {
         }),
 
         primitive: wgpu::PrimitiveState {
-                front_face: wgpu::FrontFace::Ccw,
-                cull_mode: Some(wgpu::Face::Back),
-                ..Default::default()
-            },
-            depth_stencil: Some(wgpu::DepthStencilState {
-                format: texture::Texture::DEPTH_FORMAT,
-                depth_write_enabled: true,
-                depth_compare: wgpu::CompareFunction::Less,
-                stencil: wgpu::StencilState::default(),
-                bias: wgpu::DepthBiasState::default(),
-            }),
+            front_face: wgpu::FrontFace::Ccw,
+            cull_mode: Some(wgpu::Face::Back),
+            ..Default::default()
+        },
+        depth_stencil: Some(wgpu::DepthStencilState {
+            format: texture::Texture::DEPTH_FORMAT,
+            depth_write_enabled: true,
+            depth_compare: wgpu::CompareFunction::Less,
+            stencil: wgpu::StencilState::default(),
+            bias: wgpu::DepthBiasState::default(),
+        }),
 
-            multisample: wgpu::MultisampleState::default(),
-            multiview: None,
-        });
+        multisample: wgpu::MultisampleState::default(),
+        multiview: None,
+    });
 
-        let mut buffers = Storrage {
-            uniform_buffer,
-            vertex_buffer,
-            diffuse_bind_group,
-            camera_buffer,
-            index_buffer,
-            instance_buffer,
-            vertex_list: vec![],
-            indecies: vec![],
-            instances: Vec::new(),
-        };
+    let mut buffers = Storrage {
+        uniform_buffer,
+        vertex_buffer,
+        diffuse_bind_group,
+        camera_buffer,
+        index_buffer,
+        instance_buffer,
+        vertex_list: vec![],
+        indecies: vec![],
+        instances: Vec::new(),
+    };
 
-        let test = //Mesh::default();
+    let test = //Mesh::default();
             instances::Mesh::from_file_obj(include_str!("./../../assets/untitled.obj").to_string());
 
     test.load(&mut buffers, device);
@@ -343,13 +346,19 @@ pub async fn run(game_window: display_handler::GameWindow) {
         .run(move |event, target| {
             let _ = (&adapter, &shader, &pipeline_layout);
 
+            if let Event::DeviceEvent {
+                device_id: _,
+                event,
+            } = &event
+            {
+                cam_controller.process_events(&event);
+            }
+
             if let Event::WindowEvent {
                 window_id: _,
                 event,
             } = event
             {
-                cam_controller.process_events(&event);
-                cam_controller.update_camera(&mut cam);
                 match event {
                     WindowEvent::CloseRequested => target.exit(),
                     WindowEvent::Resized(physical_size) => {
@@ -359,6 +368,7 @@ pub async fn run(game_window: display_handler::GameWindow) {
                         game_window.window.request_redraw();
                     }
                     WindowEvent::RedrawRequested => {
+                        cam_controller.update_camera(&mut cam);
                         //test.cframe.position.y = 10.0;
                         //buffers.update_instance_buffer(&device);
 

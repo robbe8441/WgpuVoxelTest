@@ -25,7 +25,6 @@ pub fn generate_chunk(device: &wgpu::Device, queue: &wgpu::Queue) -> Texture {
         } else {
             result.push(0);
         }
-
     }
 
     let size = wgpu::Extent3d {
