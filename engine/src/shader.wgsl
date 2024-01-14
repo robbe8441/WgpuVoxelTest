@@ -63,7 +63,7 @@ struct Uniforms {
 }
 
 @group(1) @binding(1)
-var t_diffuse: texture_3d<u32>;
+var voxel_data: texture_3d<u32>;
 @group(1) @binding(2)
 var<uniform> uniforms: Uniforms;
 
@@ -132,6 +132,90 @@ fn rayCubeIntersection(rayOrigin: vec3<f32>, rayDirection: vec3<f32>, cubeMin: v
 }
 
 
+fn RayCast(origin: vec3<f32>, dir: vec3<f32>) -> vec4<f32> {
+  let chunk_res = vec3(20.0 - 0.01);
+  let voxel = 1.0 / chunk_res.x;
+
+  let RayStepX = sqrt(voxel + pow(dir.y / dir.x, 2.0) + pow(dir.z / dir.x, 2.0));
+  let RayStepY = sqrt(voxel + pow(dir.x / dir.y, 2.0) + pow(dir.z / dir.y, 2.0));
+  let RayStepZ = sqrt(voxel + pow(dir.x / dir.z, 2.0) + pow(dir.y / dir.z, 2.0));
+
+  var StepVectorX : f32;
+  var StepVectorY : f32;
+  var StepVectorZ : f32;
+
+  var RayLenghX : f32;
+  var RayLenghY : f32;
+  var RayLenghZ : f32;
+
+  var MapCheckX = floor(origin.x * chunk_res.x) / chunk_res.x;
+  var MapCheckY = floor(origin.y * chunk_res.y) / chunk_res.y;
+  var MapCheckZ = floor(origin.z * chunk_res.z) / chunk_res.z;
+
+
+  if dir.x < 0.0 {
+    RayLenghX = (origin.x - MapCheckX) * RayStepX;
+    StepVectorX = -voxel;
+  } else {
+    RayLenghX = ((MapCheckX + voxel) - origin.x) * RayStepX;
+    StepVectorX = voxel;
+  }
+
+  if dir.y < 0.0 {
+    RayLenghY = (origin.y - MapCheckY) * RayStepY;
+    StepVectorY = -voxel;
+  } else {
+    RayLenghY = ((MapCheckY + voxel) - origin.y) * RayStepY;
+    StepVectorY = voxel;
+  }
+
+  if dir.z < 0.0 {
+    RayLenghZ = (origin.z - MapCheckZ) * RayStepZ;
+    StepVectorZ = -voxel;
+  } else {
+    RayLenghZ = ((MapCheckZ + voxel) - origin.z) * RayStepZ;
+    StepVectorZ = voxel;
+  }
+
+  let max_dis = 100.0;
+  var current_dis = 0.0;
+
+  while current_dis < max_dis {
+    let min_ray_lengh = min(RayLenghX, min(RayLenghY, RayLenghZ));
+
+    if min_ray_lengh == RayLenghX {
+      MapCheckX -= StepVectorX;
+      current_dis = RayLenghX;
+      RayLenghX += RayStepX;
+
+    } else if min_ray_lengh == RayLenghY {
+      MapCheckY -= StepVectorY;
+      current_dis = RayLenghY;
+      RayLenghY += RayStepY;
+
+    } else {
+      MapCheckZ -= StepVectorZ;
+      current_dis = RayLenghZ;
+      RayLenghZ += RayStepZ;
+    }
+
+    if MapCheckX > chunk_res.x || MapCheckY > chunk_res.z || MapCheckZ > chunk_res.z || MapCheckX < 0.0 || MapCheckY < 0.0 || MapCheckZ < 0.0 {
+      break;
+    }
+
+    let val = textureLoad(voxel_data, vec3i(i32(MapCheckX / voxel), i32(MapCheckY / voxel), i32(MapCheckZ / voxel)), 0);
+
+    if any(val.r != 0u) {
+      return vec4(vec3(1.0 / (current_dis / 2.0)), 1.0);
+    }
+  }
+
+  return vec4(0.1);
+}
+
+
+
+
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
   let model_position = in.model_matrix_3.xyz;
@@ -141,27 +225,17 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     in.model_matrix_2.xyz
   );
 
+
   let cam_pos = (vec3(uniforms.cam_x, uniforms.cam_y, uniforms.cam_z) - model_position) * model_rotation;
   let dir = normalize(cam_pos - in.uv_cords);
+  let val = RayCast(cam_pos, dir);
 
   let min = vec3(-1.0);
   let max = vec3(1.0);
 
   let start_pos = rayCubeIntersection(cam_pos, dir, min, max) + vec3(1.0);
 
-  for (var i=1; i<2000; i=i+1) {
-    let checkpos = start_pos + (dir / vec3(500.0)) * vec3(f32(-i));
+  let ray_res = RayCast(start_pos, dir);
 
-    if checkpos.x > 2.0 || checkpos.x < 0.0 || checkpos.z > 2.0 || checkpos.z < 0.0 || checkpos.y < 0.0 || checkpos.y > 2.0 {
-      break;
-    }
-
-    let pos = (checkpos * vec3(9.999));
-    let val = textureLoad(t_diffuse, vec3i(i32(pos.x) % 100, i32(pos.y) % 100, i32(pos.z) % 100), 0);
-
-    if any(val.r != 0u) {
-        return vec4(f32(val.r) / f32(i));
-    }
-  }
-  return vec4(0.0);
+  return ray_res;
 }

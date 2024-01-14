@@ -39,6 +39,7 @@ pub struct Storrage {
     indecies: Vec<u16>,
     instances: Vec<instances::CFrame>,
     diffuse_bind_group: wgpu::BindGroup,
+    depth_texture: Texture,
 }
 
 impl Storrage {
@@ -67,7 +68,6 @@ struct RenderScene<'a> {
     surface: &'a wgpu::Surface,
     window: &'a winit::window::Window,
     buffers: &'a Storrage,
-    depth_texture: &'a Texture,
 }
 
 fn render_scene(scene: &mut RenderScene) {
@@ -109,7 +109,7 @@ fn render_scene(scene: &mut RenderScene) {
             })],
 
             depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                view: &scene.depth_texture.view,
+                view: &scene.buffers.depth_texture.view,
                 depth_ops: Some(wgpu::Operations {
                     load: wgpu::LoadOp::Clear(1.0),
                     store: wgpu::StoreOp::Store,
@@ -330,6 +330,7 @@ pub async fn run(game_window: display_handler::GameWindow) {
         vertex_list: vec![],
         indecies: vec![],
         instances: Vec::new(),
+        depth_texture,
     };
 
     let test = instances::Mesh::from_file_obj(include_str!("./../../assets/untitled.obj").to_string());
@@ -339,15 +340,12 @@ pub async fn run(game_window: display_handler::GameWindow) {
 
 
 
-    let mut test = instances::Mesh::from_file_obj(include_str!("./../../assets/untitled.obj").to_string());
-    test.cframe.position = [0.0, 2.0, 0.0].into();
-    test.cframe.rotation = cgmath::Quaternion::from_angle_y(Deg(10.0));
+    //let mut test = instances::Mesh::from_file_obj(include_str!("./../../assets/untitled.obj").to_string());
+    //test.cframe.position = [0.0, 2.0, 0.0].into();
+    //test.cframe.rotation = cgmath::Quaternion::from_angle_y(Deg(10.0));
 
-    test.load(&mut buffers, device);
-    buffers.update_instance_buffer(&game_window.queue);
-    
-
-
+    //test.load(&mut buffers, device);
+    //buffers.update_instance_buffer(&game_window.queue);
 
     let mut cam_controller = camera::CameraController::new(0.5);
 
@@ -386,7 +384,6 @@ pub async fn run(game_window: display_handler::GameWindow) {
                         render_scene({
                             &mut RenderScene {
                                 render_pipeline: &render_pipeline,
-                                depth_texture: &depth_texture,
                                 camera_bind_group: &camera_bind_group,
                                 surface,
                                 device,
