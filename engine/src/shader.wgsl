@@ -133,12 +133,12 @@ fn rayCubeIntersection(rayOrigin: vec3<f32>, rayDirection: vec3<f32>, cubeMin: v
 
 
 fn RayCast(origin: vec3<f32>, dir: vec3<f32>) -> vec4<f32> {
-  let chunk_res = vec3(20.0 - 0.01);
+  let chunk_res = vec3(20.0 - 0.001);
   let voxel = 1.0 / chunk_res.x;
 
-  let RayStepX = sqrt(voxel + pow(dir.y / dir.x, 2.0) + pow(dir.z / dir.x, 2.0));
-  let RayStepY = sqrt(voxel + pow(dir.x / dir.y, 2.0) + pow(dir.z / dir.y, 2.0));
-  let RayStepZ = sqrt(voxel + pow(dir.x / dir.z, 2.0) + pow(dir.y / dir.z, 2.0));
+  let RayStepX = sqrt(1.0 + pow(dir.y / dir.x, 2.0) + pow(dir.z / dir.x, 2.0)) / chunk_res.x;
+  let RayStepY = sqrt(1.0 + pow(dir.x / dir.y, 2.0) + pow(dir.z / dir.y, 2.0)) / chunk_res.y;
+  let RayStepZ = sqrt(1.0 + pow(dir.x / dir.z, 2.0) + pow(dir.y / dir.z, 2.0)) / chunk_res.z;
 
   var StepVectorX : f32;
   var StepVectorY : f32;
@@ -184,29 +184,29 @@ fn RayCast(origin: vec3<f32>, dir: vec3<f32>) -> vec4<f32> {
     let min_ray_lengh = min(RayLenghX, min(RayLenghY, RayLenghZ));
 
     if min_ray_lengh == RayLenghX {
-      MapCheckX -= StepVectorX;
+      MapCheckX += StepVectorX;
       current_dis = RayLenghX;
       RayLenghX += RayStepX;
 
     } else if min_ray_lengh == RayLenghY {
-      MapCheckY -= StepVectorY;
+      MapCheckY += StepVectorY;
       current_dis = RayLenghY;
       RayLenghY += RayStepY;
 
     } else {
-      MapCheckZ -= StepVectorZ;
+      MapCheckZ += StepVectorZ;
       current_dis = RayLenghZ;
       RayLenghZ += RayStepZ;
     }
 
-    if MapCheckX > chunk_res.x || MapCheckY > chunk_res.z || MapCheckZ > chunk_res.z || MapCheckX < 0.0 || MapCheckY < 0.0 || MapCheckZ < 0.0 {
+    if MapCheckX > 2.0 || MapCheckY > 2.0 || MapCheckZ > 2.0 || MapCheckX < 0.0 || MapCheckY < 0.0 || MapCheckZ < 0.0 {
       break;
     }
 
-    let val = textureLoad(voxel_data, vec3i(i32(MapCheckX / voxel), i32(MapCheckY / voxel), i32(MapCheckZ / voxel)), 0);
+    let val = textureLoad(voxel_data, vec3i(i32(MapCheckX * chunk_res.x), i32(MapCheckY * chunk_res.y), i32(MapCheckZ * chunk_res.z)), 0);
 
     if any(val.r != 0u) {
-      return vec4(vec3(1.0 / (current_dis / 2.0)), 1.0);
+      return vec4(MapCheckX, MapCheckY, MapCheckZ, 1.0);
     }
   }
 
@@ -235,7 +235,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
   let start_pos = rayCubeIntersection(cam_pos, dir, min, max) + vec3(1.0);
 
-  let ray_res = RayCast(start_pos, dir);
+  let ray_res = RayCast(start_pos, dir * vec3(-1.0));
 
   return ray_res;
 }
