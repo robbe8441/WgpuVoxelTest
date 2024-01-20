@@ -7,7 +7,7 @@ pub mod display_handler;
 pub mod instances;
 pub mod texture;
 use camera::Camera;
-use cgmath::{prelude::*, Deg};
+use cgmath::prelude::*;
 use instances::*;
 use texture::*;
 
@@ -333,12 +333,11 @@ pub async fn run(game_window: display_handler::GameWindow) {
         depth_texture,
     };
 
-    let test = instances::Mesh::from_file_obj(include_str!("./../../assets/untitled.obj").to_string());
+    let test =
+        instances::Mesh::from_file_obj(include_str!("./../../assets/untitled.obj").to_string());
 
     test.load(&mut buffers, device);
     buffers.update_instance_buffer(&game_window.queue);
-
-
 
     //let mut test = instances::Mesh::from_file_obj(include_str!("./../../assets/untitled.obj").to_string());
     //test.cframe.position = [0.0, 2.0, 0.0].into();

@@ -132,13 +132,18 @@ fn rayCubeIntersection(rayOrigin: vec3<f32>, rayDirection: vec3<f32>, cubeMin: v
 }
 
 
-fn RayCast(origin: vec3<f32>, dir: vec3<f32>) -> vec4<f32> {
-  let chunk_res = vec3(20.0 - 0.001);
-  let voxel = 1.0 / chunk_res.x;
 
-  let RayStepX = sqrt(1.0 + pow(dir.y / dir.x, 2.0) + pow(dir.z / dir.x, 2.0)) / chunk_res.x;
-  let RayStepY = sqrt(1.0 + pow(dir.x / dir.y, 2.0) + pow(dir.z / dir.y, 2.0)) / chunk_res.y;
-  let RayStepZ = sqrt(1.0 + pow(dir.x / dir.z, 2.0) + pow(dir.y / dir.z, 2.0)) / chunk_res.z;
+
+
+
+
+fn RayCast(campos: vec3<f32>, dir: vec3<f32>) -> vec4<f32> {
+  let chunk_res = vec3(101.0);
+  let origin = campos * chunk_res / vec3(2.0);
+
+  let RayStepX = sqrt(1.0 + pow(dir.y / dir.x, 2.0) + pow(dir.z / dir.x, 2.0));
+  let RayStepY = sqrt(1.0 + pow(dir.x / dir.y, 2.0) + pow(dir.z / dir.y, 2.0));
+  let RayStepZ = sqrt(1.0 + pow(dir.x / dir.z, 2.0) + pow(dir.y / dir.z, 2.0));
 
   var StepVectorX : f32;
   var StepVectorY : f32;
@@ -148,39 +153,47 @@ fn RayCast(origin: vec3<f32>, dir: vec3<f32>) -> vec4<f32> {
   var RayLenghY : f32;
   var RayLenghZ : f32;
 
-  var MapCheckX = floor(origin.x * chunk_res.x) / chunk_res.x;
-  var MapCheckY = floor(origin.y * chunk_res.y) / chunk_res.y;
-  var MapCheckZ = floor(origin.z * chunk_res.z) / chunk_res.z;
+  var MapCheckX = floor(origin.x);
+  var MapCheckY = floor(origin.y);
+  var MapCheckZ = floor(origin.z);
 
 
   if dir.x < 0.0 {
     RayLenghX = (origin.x - MapCheckX) * RayStepX;
-    StepVectorX = -voxel;
+    StepVectorX = -1.0;
   } else {
-    RayLenghX = ((MapCheckX + voxel) - origin.x) * RayStepX;
-    StepVectorX = voxel;
+    RayLenghX = ((MapCheckX + 1.0) - origin.x) * RayStepX;
+    StepVectorX = 1.0;
   }
 
   if dir.y < 0.0 {
     RayLenghY = (origin.y - MapCheckY) * RayStepY;
-    StepVectorY = -voxel;
+    StepVectorY = -1.0;
   } else {
-    RayLenghY = ((MapCheckY + voxel) - origin.y) * RayStepY;
-    StepVectorY = voxel;
+    RayLenghY = ((MapCheckY + 1.0) - origin.y) * RayStepY;
+    StepVectorY = 1.0;
   }
 
   if dir.z < 0.0 {
     RayLenghZ = (origin.z - MapCheckZ) * RayStepZ;
-    StepVectorZ = -voxel;
+    StepVectorZ = -1.0;
   } else {
-    RayLenghZ = ((MapCheckZ + voxel) - origin.z) * RayStepZ;
-    StepVectorZ = voxel;
+    RayLenghZ = ((MapCheckZ + 1.0) - origin.z) * RayStepZ;
+    StepVectorZ = 1.0;
   }
 
-  let max_dis = 100.0;
+  let max_dis = 1000.0;
   var current_dis = 0.0;
 
   while current_dis < max_dis {
+
+    let val = textureLoad(voxel_data, vec3i(i32(MapCheckX), i32(MapCheckY), i32(MapCheckZ)), 0);
+
+    if any(val.r != 0u) {
+      return vec4(MapCheckX / chunk_res.x, MapCheckY / chunk_res.y, MapCheckZ / chunk_res.z, 1.0);
+    }
+
+
     let min_ray_lengh = min(RayLenghX, min(RayLenghY, RayLenghZ));
 
     if min_ray_lengh == RayLenghX {
@@ -199,14 +212,8 @@ fn RayCast(origin: vec3<f32>, dir: vec3<f32>) -> vec4<f32> {
       RayLenghZ += RayStepZ;
     }
 
-    if MapCheckX > 2.0 || MapCheckY > 2.0 || MapCheckZ > 2.0 || MapCheckX < 0.0 || MapCheckY < 0.0 || MapCheckZ < 0.0 {
+    if MapCheckX > chunk_res.x || MapCheckY > chunk_res.y || MapCheckZ > chunk_res.y || MapCheckX < 0.0 || MapCheckY < 0.0 || MapCheckZ < 0.0 {
       break;
-    }
-
-    let val = textureLoad(voxel_data, vec3i(i32(MapCheckX * chunk_res.x), i32(MapCheckY * chunk_res.y), i32(MapCheckZ * chunk_res.z)), 0);
-
-    if any(val.r != 0u) {
-      return vec4(MapCheckX, MapCheckY, MapCheckZ, 1.0);
     }
   }
 
